@@ -3,9 +3,14 @@
 !/.gitignore
 !/w4
 !/w4/*
+!/w5
+!/w5/*
 
 # Custom
 
+zdo_start_sec_ze
+zdo_start_sec_zc
+zdo_start_sec_zr
 *.log
 *.dump
 *.pcap
