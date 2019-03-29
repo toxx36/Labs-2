@@ -1,8 +1,8 @@
 # Whitelist
 /*
 !/.gitignore
-!/w3
-w3/*
+!/w4
+!/w4/*
 
 # Custom
 
