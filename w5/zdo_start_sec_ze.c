@@ -93,7 +93,8 @@ typedef struct ep_simple_desc_s
 static ep_simple_desc_t *ep_desc = NULL;
 
 static zb_uint8_t zr_remote_command;
-static zb_uint8_t new_buffer;
+//static zb_uint8_t new_buffer;
+static zb_uint8_t cur_index = 0;
 
 
 //static zb_uint8_t Command_send(zb_uint8_t command);
@@ -102,6 +103,7 @@ static void ieee_addr_req(zb_uint8_t param);
 static void simple_desc_req(zb_uint8_t param);
 static void active_ep_req(zb_uint8_t param);
 static void power_desc_req(zb_uint8_t param);
+static void send_to_clust(zb_uint8_t param);
 
 static void simple_desc_output(zb_uint8_t offset);
 static void ep_trace_output(void);
@@ -110,15 +112,11 @@ void ieee_addr_callback(zb_uint8_t param) ZB_CALLBACK;
 void simple_desc_callback(zb_uint8_t param) ZB_CALLBACK;
 void active_ep_callback(zb_uint8_t param) ZB_CALLBACK;
 void node_power_desc_callback(zb_uint8_t param) ZB_CALLBACK;
+void data_indication(zb_uint8_t param) ZB_CALLBACK;
 
-void send_data_by_addr(zb_uint8_t param) ZB_CALLBACK;
 void next_command(zb_uint8_t param) ZB_CALLBACK;
 void send_command(zb_uint8_t param) ZB_CALLBACK;
 
- 
-/*
-	ZE joins to ZC(ZR), then sends APS packet.
-*/
 
 zb_ieee_addr_t g_ieee_addr = {0x01, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02};
 
@@ -179,9 +177,8 @@ void zb_zdo_startup_complete(zb_uint8_t param) ZB_CALLBACK
 
 void next_command(zb_uint8_t param) ZB_CALLBACK ///Generate command and create new buffer
 {
-		//if(zr_remote_command > COMMAND_COUNT) zr_remote_command = 0;
-		ZB_GET_OUT_BUF_DELAYED(send_command);
-		//ZB_SCHEDULE_ALARM(next_command, 0, ZB_TIME_ONE_SECOND);
+	ZVUNUSED(param);
+	ZB_GET_OUT_BUF_DELAYED(send_command);
 }
 
 void send_command(zb_uint8_t param) ZB_CALLBACK ///Process the buffer and send command
@@ -192,12 +189,16 @@ void send_command(zb_uint8_t param) ZB_CALLBACK ///Process the buffer and send c
 		break;
 		case 1:
 			power_desc_req(param);
-	   	break;
-	   	case 2:
+	  break;
+	 	case 2:
 			active_ep_req(param);
 		break;
 		case 3:
 			simple_desc_req(param);
+		break;
+		case 4:
+			send_to_clust(param);
+			zb_af_set_data_indication(data_indication);
 		break;
 		default:
 		break;
@@ -205,34 +206,11 @@ void send_command(zb_uint8_t param) ZB_CALLBACK ///Process the buffer and send c
 	TRACE_MSG(TRACE_APS2, "### end of switch", (FMT__0));	
 }
 
-void send_data_by_addr(zb_uint8_t param) ZB_CALLBACK
-{
-	zb_buf_t *buf = (zb_buf_t *)ZB_BUF_FROM_REF(param);
-	zb_apsde_data_req_t *req;
-	zb_uint16_t address = *(uint16_t *)ZB_GET_BUF_TAIL(buf, sizeof(zb_uint16_t));
-
-	req = ZB_GET_BUF_TAIL(buf, sizeof(zb_apsde_data_req_t));
-	req->dst_addr.addr_short = address; /* send to ZC */
-	req->addr_mode = ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
-	req->tx_options = ZB_APSDE_TX_OPT_ACK_TX;
-	req->radius = 1;
-	req->profileid = 2;
-	req->src_endpoint = 10;
-	req->dst_endpoint = 10;
-
-	buf->u.hdr.handle = 0x11;
-
-	TRACE_MSG(TRACE_APS2, "Sending apsde_data.request", (FMT__0));
-	ZB_SCHEDULE_CALLBACK(zb_apsde_data_request, ZB_REF_FROM_BUF(buf));
-}
-
 void ieee_addr_callback(zb_uint8_t param) ZB_CALLBACK
 {
   zb_buf_t *buf = ZB_BUF_FROM_REF(param);
   zb_zdo_nwk_addr_resp_head_t *resp;
   zb_ieee_addr_t ieee_addr;
-  zb_uint16_t nwk_addr;
-  zb_address_ieee_ref_t addr_ref;
   TRACE_MSG(TRACE_ZDO2, "zb_get_peer_short_addr_cb param %hd", (FMT__H, param));
   resp = (zb_zdo_nwk_addr_resp_head_t*)ZB_BUF_BEGIN(buf);
   TRACE_MSG(TRACE_ZDO2, "#### resp status %hd, nwk addr %d", (FMT__H_D, resp->status, resp->nwk_addr));
@@ -266,10 +244,9 @@ void active_ep_callback(zb_uint8_t param) ZB_CALLBACK /* Save and trace endpoint
 void simple_desc_callback(zb_uint8_t param) ZB_CALLBACK /* Process endpoint description */
 {
   zb_buf_t *buf = ZB_BUF_FROM_REF(param);
-  void *zdp_cmd;
   zb_uint8_t *output_count_pos;
+  ep_clusters_t* cur_ep = ep_desc->clusters + cur_index;
   zb_zdo_simple_desc_resp_t *resp = (zb_zdo_simple_desc_resp_t*)ZB_BUF_BEGIN(buf);
-  zb_zdo_active_ep_req_t *req;
   TRACE_MSG(TRACE_APS1, "simple_desc_callback status %hd, addr 0x%x",
             (FMT__H, resp->hdr.status, resp->hdr.nwk_addr));
   if (resp->hdr.status != ZB_ZDP_STATUS_SUCCESS || resp->hdr.nwk_addr != 0x0)
@@ -278,28 +255,51 @@ void simple_desc_callback(zb_uint8_t param) ZB_CALLBACK /* Process endpoint desc
   }
   else
   {
-  	/*uint8 input_count - uint16 input_list[input_count] - uint8 output_count - uint16 output_list[output_count] */
-  	ep_desc->clusters = (ep_clusters_t*) realloc(ep_desc->clusters, sizeof(ep_clusters_t) * ep_desc->ep_count);
-  	ep_desc->clusters->input_count = resp->simple_desc.app_input_cluster_count;
-  	output_count_pos = ((zb_uint16_t *) (&resp->simple_desc.app_input_cluster_count + 1)) + resp->simple_desc.app_input_cluster_count; /* Move to start of input clusters - move to output clusters count */  
-  	ep_desc->clusters->output_count = *output_count_pos;
+  	/* uint8 input_count - uint16 input_list[input_count] - uint8 output_count - uint16 output_list[output_count] */
+
+  	cur_ep->input_count = resp->simple_desc.app_input_cluster_count;
+  	output_count_pos = (zb_uint8_t*)(((zb_uint16_t *) (&resp->simple_desc.app_input_cluster_count + 1)) + resp->simple_desc.app_input_cluster_count); /* Move to start of input clusters - move to output clusters count */  
+  	cur_ep->output_count = *output_count_pos;
   	
-  	ep_desc->clusters->input_list = (zb_uint16_t*) calloc(ep_desc->clusters->input_count, sizeof(zb_uint16_t));
-  	memcpy(ep_desc->clusters->input_list, &resp->simple_desc.app_input_cluster_count + 1, sizeof(zb_uint16_t) * ep_desc->clusters->input_count);
-  	
-  	ep_desc->clusters->output_list = (zb_uint16_t*) calloc(ep_desc->clusters->output_count, sizeof(zb_uint16_t));
-  	memcpy(ep_desc->clusters->output_list, output_count_pos + 1, sizeof(zb_uint16_t) * ep_desc->clusters->output_count);
+  	if(cur_ep->input_count > 0)
+  	{
+  		cur_ep->input_list = (zb_uint16_t*) calloc(cur_ep->input_count, sizeof(zb_uint16_t));
+  		memcpy(cur_ep->input_list, &resp->simple_desc.app_input_cluster_count + 1, sizeof(zb_uint16_t) * cur_ep->input_count);
+  	}
+  	if(cur_ep->output_count > 0)
+  	{
+  		cur_ep->output_list = (zb_uint16_t*) calloc(cur_ep->output_count, sizeof(zb_uint16_t));
+  		memcpy(cur_ep->output_list, output_count_pos + 1, sizeof(zb_uint16_t) * cur_ep->output_count);
+  	}
     TRACE_MSG(TRACE_APS1, "### Clusters saved!", (FMT__0)); 
     
-    ep_desc->clusters->app_ver = resp->simple_desc.app_device_version;
-    ep_desc->clusters->app_dev = resp->simple_desc.app_device_id;
-    ep_desc->clusters->profile = resp->simple_desc.app_profile_id;
+    cur_ep->app_ver = resp->simple_desc.app_device_version;
+    cur_ep->app_dev = resp->simple_desc.app_device_id;
+    cur_ep->profile = resp->simple_desc.app_profile_id;
     
-	simple_desc_output(0);
-    
+		simple_desc_output(cur_index);
   }
+	cur_index++;
+	if(cur_index >= ep_desc->ep_count)
+	{
+		cur_index = 0;
+		zr_remote_command++;
+	}
   ZB_SCHEDULE_CALLBACK(next_command, 0);
   zb_free_buf(buf);
+}
+
+
+void data_indication(zb_uint8_t param) ZB_CALLBACK
+{
+  zb_uint8_t *ptr;
+  zb_buf_t *asdu = (zb_buf_t *)ZB_BUF_FROM_REF(param);
+
+  /* Remove APS header from the packet */
+  ZB_APS_HDR_CUT_P(asdu, ptr);
+
+  TRACE_MSG(TRACE_APS3, "###data_indication: packet %p len %d handle 0x%x", (FMT__P_D_D,
+                         asdu, (int)ZB_BUF_LEN(asdu), asdu->u.hdr.status));
 }
 
 void node_power_desc_callback(zb_uint8_t param) ZB_CALLBACK
@@ -307,7 +307,6 @@ void node_power_desc_callback(zb_uint8_t param) ZB_CALLBACK
   zb_buf_t *buf = ZB_BUF_FROM_REF(param);
   zb_uint8_t *zdp_cmd = ZB_BUF_BEGIN(buf);
   zb_zdo_power_desc_resp_t *resp = (zb_zdo_power_desc_resp_t*)(zdp_cmd);
-  zb_zdo_simple_desc_req_t *req;
   TRACE_MSG(TRACE_APS1, " node_power_desc_callback status %hd, addr 0x%x",
             (FMT__H, resp->hdr.status, resp->hdr.nwk_addr));
   if (resp->hdr.status != ZB_ZDP_STATUS_SUCCESS || resp->hdr.nwk_addr != 0x0)
@@ -374,13 +373,13 @@ static void simple_desc_req(zb_uint8_t param)
 {
 	zb_buf_t *buf = (zb_buf_t *)ZB_BUF_FROM_REF(param);
 	zb_zdo_simple_desc_req_t *req = NULL;
-	zb_uint8_t i;
+
 	ZB_BUF_INITIAL_ALLOC(buf, sizeof(zb_zdo_simple_desc_req_t), req);
 	req->nwk_addr = 0; //send to coordinator
-	req->endpoint = *(ep_desc->ep_list + 0);		
+	req->endpoint = *(ep_desc->ep_list + cur_index);
+	ep_desc->clusters = (ep_clusters_t*) realloc(ep_desc->clusters, sizeof(ep_clusters_t) * ep_desc->ep_count);	
 	zb_zdo_simple_desc_req(ZB_REF_FROM_BUF(buf), simple_desc_callback);
 	TRACE_MSG(TRACE_APS2, "### Simple desc command sended", (FMT__0));
-	zr_remote_command++;
 }
 
 static void active_ep_req(zb_uint8_t param)
@@ -404,5 +403,47 @@ static void power_desc_req(zb_uint8_t param)
 	TRACE_MSG(TRACE_APS2, "### Power desc command sended", (FMT__0));
 	zr_remote_command++;
 }
+
+static void send_to_clust(zb_uint8_t param)
+{
+	static zb_uint8_t cur_cluster = 0;
+  zb_buf_t *buf = ZB_BUF_FROM_REF(param);
+  zb_apsde_data_req_t *req;
+  zb_uint8_t *ptr = NULL;
+
+	ep_clusters_t* cur_ep = ep_desc->clusters + cur_index; 
+	
+	if(cur_ep->input_count > 0)
+	{
+
+	  ZB_BUF_INITIAL_ALLOC(buf, 0, ptr);
+	  req = ZB_GET_BUF_TAIL(buf, sizeof(zb_apsde_data_req_t));
+	  req->dst_addr.addr_short = 0; /* send to ZC */
+	  req->addr_mode = ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
+	  req->tx_options = ZB_APSDE_TX_OPT_ACK_TX;
+	  req->radius = 1;
+		req->clusterid = *(cur_ep->input_list + cur_cluster); 
+	  req->profileid = cur_ep->profile;
+	  req->dst_endpoint = *(ep_desc->ep_list + cur_index);
+	  req->src_endpoint = 10;
+	  buf->u.hdr.handle = 0x11;
+
+	  TRACE_MSG(TRACE_APS3, "###Sending apsde_data.request", (FMT__0));
+		cur_cluster++;
+	}
+	
+	if(cur_cluster >= cur_ep->input_count)
+	{
+		cur_cluster = 0;
+		cur_index++;
+		if(cur_index >= ep_desc->ep_count)
+		{
+			cur_index = 0;
+			zr_remote_command++;
+		}
+	}
+  ZB_SCHEDULE_CALLBACK(zb_apsde_data_request, ZB_REF_FROM_BUF(buf));
+}
+
 
 /*! @} */
