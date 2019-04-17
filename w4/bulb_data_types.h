@@ -11,14 +11,14 @@ typedef enum bulb_cmd_e {
 	BULB_BRIGHTNESS_LEVEL
 	} bulb_cmd_t;
 
-typedef struct bulb_data_cmd_param_s {
-	bulb_cmd_t command;
-	zb_uint8_t brightness;
-} ZB_PACKED_STRUCT bulb_data_cmd_param_t;
-
-typedef struct bulb_data_s {
-	zb_uint8_t parameter;
+typedef struct bulb_send_brightness_s {
 	zb_uint16_t address;
-} bulb_data_t;
+	zb_uint8_t brightness;
+} ZB_PACKED_STRUCT bulb_send_brightness_t;
+
+typedef struct bulb_brightness_s {
+	bulb_cmd_t cmd;
+	zb_uint8_t brightness;
+} bulb_brightness_t;
 
 #endif	
