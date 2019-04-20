@@ -1,0 +1,3 @@
+readme*.txt
+zdo_start_z*
+!zdo_start_z*.c
