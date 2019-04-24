@@ -46,28 +46,35 @@
 # PURPOSE: Formation and discovery tests.
 #*/
 
+INCLUDE_DIRS += -I./include
+SOURCE_DIRS += ./src
+
 BUILD_HOME=../..
 include $(BUILD_HOME)/Options
+
+CFLAGS += $(INCLUDE_DIRS)
 
 FNAME1 = zdo_start_zc
 FNAME2 = zdo_start_zr
 FNAME3 = zdo_start_ze
 
-SRCS1 = $(FNAME1).c
+SRCS1 = $(SOURCE_DIRS)/$(FNAME1).c
+SRCS1 += $(SOURCE_DIRS)/bulb_input.c
 OBJS1 = ${SRCS1:.c=.o}
-SRCS2 = $(FNAME2).c
+SRCS2 = $(SOURCE_DIRS)/$(FNAME2).c
+SRCS2 += $(SOURCE_DIRS)/bulb_remote.c
 OBJS2 = ${SRCS2:.c=.o}
-SRCS3 = $(FNAME3).c
+SRCS3 = $(SOURCE_DIRS)/$(FNAME3).c
 OBJS3 = ${SRCS3:.c=.ed.o}
 
 #SRCS1 += $(STARTCODE)
 
-$(BIN)zdo_start_zc$(EXE) : $(OBJS1)  $(LIBS) ./libled.a
+$(BIN)zdo_start_zc$(EXE) : $(OBJS1) $(LIBS) ./lib/libled.a ./lib/libbtn.a
 	$(LINK_BINARY)
 	$(OBJCOPY) -O ihex $(FNAME1) $(FNAME1).hex
 	$(OBJCOPY) -I ihex -O binary $(FNAME1).hex $(FNAME1).bin
 
-$(BIN)zdo_start_zr$(EXE) : $(OBJS2)  $(LIBS)
+$(BIN)zdo_start_zr$(EXE) : $(OBJS2)  $(LIBS) ./lib/libbtn.a
 	$(LINK_BINARY)
 	$(OBJCOPY) -O ihex $(FNAME2) $(FNAME2).hex
 	$(OBJCOPY) -I ihex -O binary $(FNAME2).hex $(FNAME2).bin
@@ -84,7 +91,10 @@ $(BIN)zdo_start_ze$(EXE) : $(OBJS3)  $(LIBS_ED)
 BINS =  $(BIN)zdo_start_zc$(EXE)
 BINS += $(BIN)zdo_start_ze$(EXE)
 BINS += $(BIN)zdo_start_zr$(EXE)
+
 all: $(BINS)
+c:
+	rm -rf *.hex *.bin *.o core core.* vgcore.* *~ */*.o src/*~ src/*.o include/*~ zdo_start_zc zdo_start_ze zdo_start_zr  
 
 #BINS_TEST='run_test.sh'
 
