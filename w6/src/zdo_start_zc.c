@@ -73,18 +73,15 @@ zb_ieee_addr_t g_zc_addr = {0x00, 0x00, 0xee, 0xff, 0xc0, 0x00, 0xef, 0xbe};
 #error Coordinator role is not compiled!
 #endif
 
-zb_uint32_t colors[6] = {0xFF0000, 0xFFFF00, 0x00FF00, 0x00FFFF, 0x0000FF, 0xFF00FF};
-zb_uint8_t bulb_state = BULB_OFF;
-zb_uint8_t bulb_cur_color = 0;
-zb_uint16_t bulb_intensity = 6;
-
-static void test_intens_led(void)
+#ifdef TEST_BTN
+static void init_test(void)
 {
 	LED_init_periph();
-	init_btn();
-	ZB_SCHEDULE_CALLBACK(btn_IRQ_cb, 0);
-	zdo_main_loop();
+	init_btn(); /***/
+	ZB_SCHEDULE_CALLBACK(buttons_scan_cb, 0);
+	zdo_main_loop(); /*!*/
 }
+#endif
 
 MAIN()
 {
@@ -97,7 +94,6 @@ MAIN()
     return 0;
   }
 #endif
-
 
   /* Init device, load IB values from nvram or set it to default */
 #ifndef ZB8051
@@ -115,7 +111,9 @@ MAIN()
   ZB_AIB().aps_designated_coordinator = 1;
   ZB_AIB().aps_channel_mask = (1l << 19);
 
- 	test_intens_led();/*~*/
+#ifdef TEST_BTN
+ 	init_test();/***/
+#endif
 
   if (zdo_dev_start() != RET_OK)
   {
@@ -138,7 +136,7 @@ void zb_zdo_startup_complete(zb_uint8_t param) ZB_CALLBACK
   if (buf->u.hdr.status == 0)
   {
     TRACE_MSG(TRACE_APS1, "Device STARTED OK", (FMT__0));
-		test_intens_led();
+		LED_init_periph();
 		zb_af_set_data_indication(bulb_get_data);
   }
   else

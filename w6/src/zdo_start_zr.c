@@ -46,7 +46,6 @@
 PURPOSE: Test for ZC application written using ZDO.
 */
 
-
 #include "zb_common.h"
 #include "zb_scheduler.h"
 #include "zb_bufpool.h"
@@ -54,6 +53,7 @@ PURPOSE: Test for ZC application written using ZDO.
 #include "zb_aps.h"
 #include "zb_zdo.h"
 
+#include "buttons.h"
 #include "bulb_remote.h"
 
 #define BULB_ADDRESS 0x0000
@@ -61,23 +61,17 @@ PURPOSE: Test for ZC application written using ZDO.
 /*! \addtogroup ZB_TESTS */
 /*! @{ */
 
-//zb_uint16_t cur_led;
-//static void board_init();
+void buttons_scan_cb(zb_uint8_t param) ZB_CALLBACK;
+void buttons_click_handle_cb(zb_uint8_t param) ZB_CALLBACK;
+void send_command_toggle(zb_uint8_t param) ZB_CALLBACK; 
+void send_command_color_toggle(zb_uint8_t param) ZB_CALLBACK;
+void send_command_step_up(zb_uint8_t param) ZB_CALLBACK;
+static void init_btn(void);
 
-bulb_cmd_t remote_command = BULB_ON;
-zb_uint8_t demo_level = 0;
-uint16_t bulb_address = BULB_ADDRESS;
+typedef enum {bBoard = 0, bLeft, bRight} Buttons;
 
-//void next_command(zb_uint8_t param) ZB_CALLBACK;
+zb_uint16_t bulb_address = BULB_ADDRESS;
 
-#ifndef APS_RETRANSMIT_TEST
-
-#endif
-
-/*
-  ZR joins to ZC, then sends APS packet.
- */
- 
 zb_ieee_addr_t g_zr_addr = {0x01, 0x8D, 0x00, 0xad, 0xde, 0x00, 0xce, 0xfa};
 
 MAIN()
@@ -87,7 +81,6 @@ MAIN()
 #if !(defined KEIL || defined SDCC|| defined ZB_IAR)
   if ( argc < 3 )
   {
-    //printf("%s <read pipe path> <write pipe path>\n", argv[0]);
     return 0;
   }
 #endif
@@ -103,8 +96,8 @@ MAIN()
 #endif
 
   ZB_AIB().aps_channel_mask = (1l << 19); 
-  ZB_IEEE_ADDR_COPY(ZB_PIB_EXTENDED_ADDRESS(), &g_zr_addr); 
-//  board_init();
+  ZB_IEEE_ADDR_COPY(ZB_PIB_EXTENDED_ADDRESS(), &g_zr_addr);
+  
 	init_btn();
 	
   if (zdo_dev_start() != RET_OK)
@@ -127,7 +120,7 @@ void zb_zdo_startup_complete(zb_uint8_t param) ZB_CALLBACK
 	if (buf->u.hdr.status == 0)
 	{
 		TRACE_MSG(TRACE_APS1, "Device STARTED OK", (FMT__0));
-		ZB_SCHEDULE_CALLBACK(btn_IRQ_cb, 0);
+		ZB_SCHEDULE_CALLBACK(buttons_scan_cb, 0);
 	}
 	else
 	{
@@ -135,41 +128,89 @@ void zb_zdo_startup_complete(zb_uint8_t param) ZB_CALLBACK
 		zb_free_buf(buf);
 	}
 }
-/*
-void next_command(zb_uint8_t param) ZB_CALLBACK ///Generate command and create new buffer
+
+void buttons_click_handle_cb(zb_uint8_t param) ZB_CALLBACK
 {
-//	remote_command++;
-//	demo_level += 11;
-//	if(remote_command > BULB_BRIGHTNESS_LEVEL) remote_command = BULB_ON;
 	ZVUNUSED(param);
-	ZB_GET_OUT_BUF_DELAYED(send_command);
-//	ZB_SCHEDULE_ALARM(next_command, 0, ZB_TIME_ONE_SECOND);
+	static uint8_t prev_cnt = 0;
+	if(Button_onPressCount() == 0)
+	{
+		prev_cnt = 0;
+	}
+	else if(Button_onPressCount() == 2)
+	{
+		prev_cnt = 2;
+		if(Button_withRepeat(bRight)) 
+		{
+			ZB_GET_OUT_BUF_DELAYED(send_command_color_toggle);			
+		}
+	}
+	if(prev_cnt != 2)
+	{
+		if(Button_onHold(bLeft) && Button_withRepeat(bLeft)) 
+		{
+			ZB_GET_OUT_BUF_DELAYED(send_command_step_up);
+		}
+		else if (Button_onHold(bRight) && Button_pressed(bRight))
+		{
+			ZB_GET_OUT_BUF_DELAYED(send_command_toggle);
+		}
+	}
 }
-*/
-/*
-  GPIO_Write(GPIOD, cur_led);
-  cur_led <<= 1;
-  if(cur_led == 0) cur_led = GPIO_Pin_12;
-*/
 
-/*
-static void board_init()
+static void init_btn(void)
 {
-	cur_led = GPIO_Pin_12;
-  GPIO_InitTypeDef GPIO_InitStructure;
+	GPIO_InitTypeDef GPIO_InitStructure = {0};
+	/* Init LEDs on discovery board */
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
+	GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_12 | GPIO_Pin_13 | GPIO_Pin_14 | GPIO_Pin_15;
+	GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_OUT;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+	GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_NOPULL;
+	GPIO_Init(GPIOD, &GPIO_InitStructure);
+	GPIO_ResetBits(LED_PORT,LED_FIRST_PIN<<0|LED_FIRST_PIN<<1|LED_FIRST_PIN<<2|LED_FIRST_PIN<<3);
 
-  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
-
-  GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_12 | GPIO_Pin_13 | GPIO_Pin_14 | GPIO_Pin_15;
-  GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_OUT;
-  GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-  GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_NOPULL;
-
-  GPIO_Init(GPIOD, &GPIO_InitStructure);
-  
-  GPIO_SetBits(GPIOD, GPIO_Pin_12 | GPIO_Pin_13 | GPIO_Pin_14 | GPIO_Pin_15);
-  
+	///The order matches the names of the buttons
+	static uint16_t pins[] = {GPIO_Pin_0, GPIO_Pin_0, GPIO_Pin_1};
+	static GPIO_TypeDef *ports[] = {GPIOA, GPIOE, GPIOE}; 
+	static GPIOPuPd_TypeDef pupd[] = {GPIO_PuPd_DOWN, GPIO_PuPd_UP, GPIO_PuPd_UP};
+	static buttons_phys_t buttons = {pins, ports, pupd};
+	ButtonInit(3, &buttons);
+	uint32_t rcc[] = {RCC_AHB1Periph_GPIOA, RCC_AHB1Periph_GPIOE};
+	ButtonPeriphInit(2, rcc);
 }
-*/
-/*! @} */
+
+void buttons_scan_cb(zb_uint8_t param) ZB_CALLBACK
+{
+	ZVUNUSED(param);
+	if(Buttons_IRQ())
+	{
+		ZB_SCHEDULE_CALLBACK(buttons_click_handle_cb, 0);
+	}
+	ZB_SCHEDULE_ALARM(buttons_scan_cb, 0, 1);
+}
+
+void send_command_toggle(zb_uint8_t param) ZB_CALLBACK 
+{
+	zb_buf_t *buf = (zb_buf_t *)ZB_BUF_FROM_REF(param);
+	zb_uint16_t *bulb_addr = ZB_GET_BUF_TAIL(buf, sizeof(zb_uint16_t));
+	*bulb_addr = bulb_address;
+	ZB_SCHEDULE_CALLBACK(send_bulb_toggle, param);
+}
+
+void send_command_step_up(zb_uint8_t param) ZB_CALLBACK 
+{
+	zb_buf_t *buf = (zb_buf_t *)ZB_BUF_FROM_REF(param);
+	zb_uint16_t *bulb_addr = ZB_GET_BUF_TAIL(buf, sizeof(zb_uint16_t));
+	*bulb_addr = bulb_address;
+	ZB_SCHEDULE_CALLBACK(send_bulb_brightness_step_up, param);
+}
+
+void send_command_color_toggle(zb_uint8_t param) ZB_CALLBACK
+{
+	zb_buf_t *buf = (zb_buf_t *)ZB_BUF_FROM_REF(param);
+	zb_uint16_t *bulb_addr = ZB_GET_BUF_TAIL(buf, sizeof(zb_uint16_t));
+	*bulb_addr = bulb_address;
+	ZB_SCHEDULE_CALLBACK(send_bulb_color_toggle, param);
+}

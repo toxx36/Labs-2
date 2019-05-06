@@ -56,7 +56,6 @@ CFLAGS += $(INCLUDE_DIRS)
 
 FNAME1 = zdo_start_zc
 FNAME2 = zdo_start_zr
-FNAME3 = zdo_start_ze
 
 SRCS1 = $(SOURCE_DIRS)/$(FNAME1).c
 SRCS1 += $(SOURCE_DIRS)/bulb_input.c
@@ -64,8 +63,6 @@ OBJS1 = ${SRCS1:.c=.o}
 SRCS2 = $(SOURCE_DIRS)/$(FNAME2).c
 SRCS2 += $(SOURCE_DIRS)/bulb_remote.c
 OBJS2 = ${SRCS2:.c=.o}
-SRCS3 = $(SOURCE_DIRS)/$(FNAME3).c
-OBJS3 = ${SRCS3:.c=.ed.o}
 
 #SRCS1 += $(STARTCODE)
 
@@ -79,17 +76,12 @@ $(BIN)zdo_start_zr$(EXE) : $(OBJS2)  $(LIBS) ./lib/libbtn.a
 	$(OBJCOPY) -O ihex $(FNAME2) $(FNAME2).hex
 	$(OBJCOPY) -I ihex -O binary $(FNAME2).hex $(FNAME2).bin
 
-$(BIN)zdo_start_ze$(EXE) : $(OBJS3)  $(LIBS_ED)
-	$(LINK_BINARY_ED)
-	$(OBJCOPY) -O ihex $(FNAME3) $(FNAME3).hex
-	$(OBJCOPY) -I ihex -O binary $(FNAME3).hex $(FNAME3).bin
 
 #$(BIN)zdo_start_zc_apss$(EXE) : $(SRCS1)  $(LIBS)
 #	$(CC) $(CFLAGS) -DAPS_SECUR  $(DEFINES) $(INCPATH) -o $@ $< $(LIBS) $(LIBS)
 
 
 BINS =  $(BIN)zdo_start_zc$(EXE)
-BINS += $(BIN)zdo_start_ze$(EXE)
 BINS += $(BIN)zdo_start_zr$(EXE)
 
 all: $(BINS)
@@ -103,7 +95,3 @@ burn_$(FNAME1): $(FNAME1).bin
 
 burn_$(FNAME2): $(FNAME2).bin
 	st-flash write $(FNAME2).bin 0x08000000
-
-burn_$(FNAME3): $(FNAME3).bin
-	st-flash write $(FNAME3).bin 0x08000000
-

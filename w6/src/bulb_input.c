@@ -8,11 +8,18 @@ static void bulb_brightness_up(void);
 static void bulb_brightness_down(void);
 static void bulb_brightness_level(bulb_brightness_t *bulb_brightness);
 
+static zb_uint32_t colors[] = {0xFF0000, 0xFFFF00, 0x00FF00, 0x00FFFF, 0x0000FF, 0xFF00FF};
+static zb_uint8_t bulb_state = BULB_OFF;
+static zb_uint8_t bulb_cur_color = 0;
+static zb_uint16_t bulb_intensity = 6;
+
+#ifdef TEST_BTN
+/* * * * buttons test * * * */
+typedef enum {bBoard = 0, bLeft, bRight} Buttons;
+
 void init_btn(void)
 {
-
 	GPIO_InitTypeDef GPIO_InitStructure = {0};
-
 	/* Init LEDs on discovery board */
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
 	GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_12 | GPIO_Pin_13 | GPIO_Pin_14 | GPIO_Pin_15;
@@ -21,71 +28,58 @@ void init_btn(void)
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
 	GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_NOPULL;
 	GPIO_Init(GPIOD, &GPIO_InitStructure);
+	GPIO_ResetBits(LED_PORT,LED_FIRST_PIN<<0|LED_FIRST_PIN<<1|LED_FIRST_PIN<<2|LED_FIRST_PIN<<3);
 
 	///The order matches the names of the buttons
-	uint16_t pins[] = {GPIO_Pin_0, GPIO_Pin_0, GPIO_Pin_1};
-	GPIO_TypeDef *ports[] = {GPIOA, GPIOE, GPIOE}; 
-	GPIOPuPd_TypeDef pupd[] = {GPIO_PuPd_DOWN, GPIO_PuPd_UP, GPIO_PuPd_UP};
-	buttons_init_t buttons = {pins, ports, pupd};
-	uint32_t rcc[] = {RCC_AHB1Periph_GPIOA, RCC_AHB1Periph_GPIOE};	
-	ButtonInit(3, &buttons, 2, rcc);
-
-
-	GPIO_ResetBits(LED_PORT,LED_FIRST_PIN<<0|LED_FIRST_PIN<<1|LED_FIRST_PIN<<2|LED_FIRST_PIN<<3);
-	
+	static uint16_t pins[] = {GPIO_Pin_0, GPIO_Pin_0, GPIO_Pin_1};
+	static GPIO_TypeDef *ports[] = {GPIOA, GPIOE, GPIOE}; 
+	static GPIOPuPd_TypeDef pupd[] = {GPIO_PuPd_DOWN, GPIO_PuPd_UP, GPIO_PuPd_UP};
+	static buttons_phys_t buttons = {pins, ports, pupd};
+	ButtonInit(3, &buttons);
+	uint32_t rcc[] = {RCC_AHB1Periph_GPIOA, RCC_AHB1Periph_GPIOE};
+	ButtonPeriphInit(2, rcc);
 }
 
-void button_bulb(zb_uint8_t param) ZB_CALLBACK
+void buttons_click_test_cb(zb_uint8_t param) ZB_CALLBACK
 {
 	ZVUNUSED(param);
-	bulb_brightness_t brght = {0};
 	static uint8_t prev_cnt = 0;
-		if(Button_onPressCount() == 0)
+	if(Button_onPressCount() == 0)
+	{
+		prev_cnt = 0;
+	}
+	else if(Button_onPressCount() == 2)
+	{
+		prev_cnt = 2;
+		if(Button_withRepeat(bRight)) 
 		{
-			prev_cnt = 0;
+			bulb_toggle_color();
 		}
-		else if(Button_onPressCount() == 2)
+	}
+	if(prev_cnt != 2)
+	{
+		if(Button_onHold(bLeft) && Button_withRepeat(bLeft)) 
 		{
-			prev_cnt = 2;
-			if(Button_withRepeat(bRight)) 
-			{
-				bulb_toggle_color();
-			}
+			bulb_brightness_up();
 		}
-		if(prev_cnt != 2)
+		else if (Button_onHold(bRight) && Button_pressed(bRight))
 		{
-			if(Button_onHold(bLeft) && Button_withRepeat(bLeft)) 
-			{
-				bulb_intensity++;
-				if(bulb_intensity > 10)
-				{
-					bulb_intensity = 0;
-				}
-				brght.brightness = bulb_intensity;
-				bulb_brightness_level(&brght);
-			}
-			else if (Button_onHold(bRight) && Button_pressed(bRight))
-			{
-				bulb_toggle();
-			}
+			bulb_toggle();
 		}
-		
-//	ZB_SCHEDULE_ALARM(button_bulb, 0, ZB_TIME_ONE_SECOND/10);
+	}
 }
 
-
-void btn_IRQ_cb(zb_uint8_t param) ZB_CALLBACK
+void buttons_scan_cb(zb_uint8_t param) ZB_CALLBACK
 {
 	ZVUNUSED(param);
-	if(Buttons_IRQ() > 0)
+	if(Buttons_IRQ())
 	{
-		GPIO_ResetBits(LED_PORT,LED_FIRST_PIN<<2|LED_FIRST_PIN<<3);
-
-		ZB_SCHEDULE_CALLBACK(button_bulb, 0);
+		ZB_SCHEDULE_CALLBACK(buttons_click_test_cb, 0);
 	}
-	ZB_SCHEDULE_ALARM(btn_IRQ_cb, 0, 1);
+	ZB_SCHEDULE_ALARM(buttons_scan_cb, 0, 1);
 }
-
+/* * * * * * * * */
+#endif
 
 void bulb_get_data(zb_uint8_t param) ZB_CALLBACK
 {
@@ -156,22 +150,20 @@ void bulb_get_data(zb_uint8_t param) ZB_CALLBACK
 	zb_free_buf(buf);
 }
 
-
 static void bulb_turn_on(void)
 {
-	TRACE_MSG(TRACE_APS2, "### Received command ON", (FMT__0));	
 	bulb_state = 1;
 	LED_set_color_HEX(colors[bulb_cur_color]);
 }
+
 static void bulb_turn_off(void)
 {
-	TRACE_MSG(TRACE_APS2, "### Received command OFF", (FMT__0));	
 	bulb_state = 0;
 	LED_set_color_HEX(0);
 }
+
 static void bulb_toggle_color(void)
 {
-	TRACE_MSG(TRACE_APS2, "### Received command TOGGLE COLOR", (FMT__0));	
 	bulb_cur_color++;
 	if(bulb_cur_color >= sizeof(colors)/sizeof(zb_uint32_t))
 	{
@@ -182,7 +174,6 @@ static void bulb_toggle_color(void)
 
 static void bulb_toggle(void)
 {
-	TRACE_MSG(TRACE_APS2, "### Received command TOGGLE", (FMT__0));	
 	if(bulb_state == 0)
 	{
 		bulb_state = 1;
@@ -197,27 +188,32 @@ static void bulb_toggle(void)
 
 static void bulb_brightness_up(void)
 {
-	TRACE_MSG(TRACE_APS2, "### Received command STEP UP", (FMT__0));
 	if(bulb_intensity < MAX_INTENSITY)
 	{
 		bulb_intensity++;
-		LED_set_intensity(bulb_intensity);
 	}
+	else
+	{
+		bulb_intensity = 0;
+	}
+	LED_set_intensity(bulb_intensity);
 }
+
 static void bulb_brightness_down(void)
 {
-	TRACE_MSG(TRACE_APS2, "### Received command STEP DOWN", (FMT__0));
 	if(bulb_intensity != 0)
 	{
 		bulb_intensity--;
-		LED_set_intensity(bulb_intensity);
-	}		
+	}	
+	else 
+	{
+		bulb_intensity = MAX_INTENSITY;
+	}
+	LED_set_intensity(bulb_intensity);	
 }
 
 static void bulb_brightness_level(bulb_brightness_t *bulb_brightness)
 {
-	TRACE_MSG(TRACE_APS2, "### Received command SET LEVEL, brightness = %d", (FMT__D, bulb_brightness->brightness));	 
 	bulb_intensity = bulb_brightness->brightness;
 	LED_set_intensity(bulb_intensity);		
-
 }
