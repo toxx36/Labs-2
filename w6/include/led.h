@@ -5,6 +5,8 @@
 #include "globals.h"
 #endif
 
+#include <stm32f4xx.h>
+
 ///\brief Sets what timer will be used
 ///\details Determines, which timer OC1-3 will be set brightness value
 #define USING_TIMER TIM1
