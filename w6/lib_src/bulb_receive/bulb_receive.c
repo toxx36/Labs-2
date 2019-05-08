@@ -1,4 +1,4 @@
-#include "bulb_input.h"
+#include "bulb_receive.h"
 
 static void bulb_turn_on(void);
 static void bulb_turn_off(void);

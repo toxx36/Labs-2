@@ -1,4 +1,4 @@
-#include "bulb_remote.h"
+#include "bulb_send.h"
 
 static void apsde_send_data(zb_uint8_t param, zb_uint16_t addr_send);
 static void send_simple_command(zb_uint8_t param, zb_uint8_t command);

@@ -21,12 +21,12 @@ $(LIB_DIR)/lib%.a : $(LIB_SRC_DIR)/%/*.o
 	@echo "Linking library $@"
 	$(MAKE_LIB)
 
-$(BIN)zdo_start_zc$(EXE) : $(OBJS1) $(LIBS) $(LIB_DIR)/libled.a $(LIB_DIR)/libbulb_input.a $(LIB_DIR)/libbuttons.a 
+$(BIN)zdo_start_zc$(EXE) : $(OBJS1) $(LIBS) $(LIB_DIR)/libled.a $(LIB_DIR)/libbulb_receive.a $(LIB_DIR)/libbuttons.a 
 	$(LINK_BINARY)
 	$(OBJCOPY) -O ihex $(FNAME1) $(FNAME1).hex
 	$(OBJCOPY) -I ihex -O binary $(FNAME1).hex $(FNAME1).bin
 
-$(BIN)zdo_start_zr$(EXE) : $(OBJS2)  $(LIBS) $(LIB_DIR)/libbuttons.a $(LIB_DIR)/libbulb_remote.a
+$(BIN)zdo_start_zr$(EXE) : $(OBJS2)  $(LIBS) $(LIB_DIR)/libbuttons.a $(LIB_DIR)/libbulb_send.a
 	$(LINK_BINARY)
 	$(OBJCOPY) -O ihex $(FNAME2) $(FNAME2).hex
 	$(OBJCOPY) -I ihex -O binary $(FNAME2).hex $(FNAME2).bin

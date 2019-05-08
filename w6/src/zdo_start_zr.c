@@ -54,7 +54,7 @@ PURPOSE: Test for ZC application written using ZDO.
 #include "zb_zdo.h"
 
 #include "buttons.h"
-#include "bulb_remote.h"
+#include "bulb_send.h"
 
 #define BULB_ADDRESS 0x0000
 

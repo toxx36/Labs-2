@@ -1,5 +1,5 @@
-#ifndef BULB_REMOTE_H
-#define BULB_REMOTE_H
+#ifndef BULB_SEND_H
+#define BULB_SEND_H
 
 #include "globals.h"
 #include "zb_common.h"
@@ -14,4 +14,4 @@ void send_bulb_brightness_step_up(zb_uint8_t param) ZB_CALLBACK;
 void send_bulb_brightness_step_down(zb_uint8_t param) ZB_CALLBACK;
 void send_bulb_brightness_level(zb_uint8_t param) ZB_CALLBACK;
 
-#endif /*BULB_REMOTE_H*/
+#endif /*BULB_SEND_H*/

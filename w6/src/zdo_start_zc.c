@@ -56,7 +56,7 @@ PURPOSE: Test for ZC application written using ZDO.
 
 #include "led.h"
 #include "buttons.h"
-#include "bulb_input.h"
+#include "bulb_receive.h"
 #include "stm32f4xx.h"
 #include "stm32f4xx_tim.h"
 #include "stm32f4xx_gpio.h"

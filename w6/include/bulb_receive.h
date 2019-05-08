@@ -1,5 +1,5 @@
-#ifndef BULB_INPUT_H
-#define BULB_INPUT_H
+#ifndef BULB_RECEIVE_H
+#define BULB_RECEIVE_H
 
 #include "globals.h"
 #include "zb_common.h"
@@ -18,4 +18,4 @@ void buttons_scan_cb(zb_uint8_t param) ZB_CALLBACK;
 void buttons_click_test_cb(zb_uint8_t param) ZB_CALLBACK;
 #endif
 
-#endif /*BULB_INPUT_H*/
+#endif /*BULB_RECEIVE_H*/
