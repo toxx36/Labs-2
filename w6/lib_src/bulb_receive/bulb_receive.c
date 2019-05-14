@@ -188,7 +188,7 @@ static void bulb_toggle(void)
 
 static void bulb_brightness_up(void)
 {
-	if(bulb_intensity < MAX_INTENSITY)
+	if(bulb_intensity < INTENSITY_STEP_COUNT)
 	{
 		bulb_intensity++;
 	}
@@ -207,7 +207,7 @@ static void bulb_brightness_down(void)
 	}	
 	else 
 	{
-		bulb_intensity = MAX_INTENSITY;
+		bulb_intensity = INTENSITY_STEP_COUNT;
 	}
 	LED_set_intensity(bulb_intensity);	
 }

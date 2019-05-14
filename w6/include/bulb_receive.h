@@ -8,7 +8,7 @@
 #include "led.h"
 #include "buttons.h"
 
-#define TEST_BTN
+//#define TEST_BTN
 
 void bulb_get_data(zb_uint8_t param) ZB_CALLBACK;
 

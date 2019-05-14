@@ -14,11 +14,6 @@
 ///Sets levels of brightness count
 #define INTENSITY_STEP_COUNT 5
 
-#define MAX_INTENSITY 10
-
-///Sets minimal value of bright in steps
-#define MIN_INTENSITY 1
-
 /**
 	\brief Performs base init
 	

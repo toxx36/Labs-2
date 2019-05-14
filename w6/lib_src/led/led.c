@@ -101,12 +101,6 @@ static uint16_t LED_calc_color(uint16_t *value) {
 	else { //other case
 		return ( ( ((uint32_t)(*value) * (*value) / INTENSITY_STEP_COUNT) * (intens_curr_step)) / MAX_INTENSITY); 
 	}
-/*
-	return 	(intens_curr_step == INTENSITY_STEP_COUNT) ?
-				(*value == MAX_INTENSITY) ? MAX_INTENSITY : //intens_curr_step is max & brightness is max
-				( (uint32_t)(*value) * (*value) / MAX_INTENSITY) : //intens_curr_step is max 
-			( ( ((uint32_t)(*value) * (*value) / INTENSITY_STEP_COUNT) * (intens_curr_step)) / MAX_INTENSITY); //other case
-*/
 }
 
 /**
