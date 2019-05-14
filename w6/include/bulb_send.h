@@ -1,9 +1,10 @@
 #ifndef BULB_SEND_H
 #define BULB_SEND_H
 
-#include "globals.h"
 #include "zb_common.h"
 #include "zb_aps.h"
+
+#include "globals.h"
 #include "bulb_data_types.h"
 
 void send_bulb_state_on(zb_uint8_t param) ZB_CALLBACK;
