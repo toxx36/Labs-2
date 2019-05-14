@@ -9,8 +9,6 @@
 #include "globals.h"
 #include "led.h"
 
-//#define TEST_BTN
-
 void bulb_get_data(zb_uint8_t param) ZB_CALLBACK;
 
 #ifdef TEST_BTN
