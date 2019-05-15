@@ -10,9 +10,9 @@
 #include "led.h"
 
 /*!
- *  /brief Function for recieve and process data for the bulb
+ *  /brief Function for receive and process data for the bulb
  *  /param param incoming buffer
- *  Set this function as data_indication
+ *  Gets command for bulb and performs it. Set it for data_indication.
  */
 void bulb_get_data(zb_uint8_t param) ZB_CALLBACK;
 
