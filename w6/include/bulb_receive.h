@@ -9,6 +9,11 @@
 #include "globals.h"
 #include "led.h"
 
+/*!
+ *  /brief Function for recieve and process data for the bulb
+ *  /param param incoming buffer
+ *  Set this function as data_indication
+ */
 void bulb_get_data(zb_uint8_t param) ZB_CALLBACK;
 
 #endif /*BULB_RECEIVE_H*/
