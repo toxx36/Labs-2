@@ -3,5 +3,5 @@ In this task STM32F407-Discovery board is used along with INMP441 24-bit I2S mic
 1. LEDs at the board responds only to sharp volume change;
 2. LEDs displays amplitude of frequencies.
 <div align="center">
-<a href="https://www.youtube.com/watch?v=EqZ_JHNOeXU"><img src="https://img.youtube.com/vi/EqZ_JHNOeXU/0.jpg" alt="IMAGE ALT TEXT"></a>
+<a href="https://www.youtube.com/watch?v=Mr1q5f2uvts"><img src="https://img.youtube.com/vi/Mr1q5f2uvts/0.jpg" alt="IMAGE ALT TEXT"></a>
 </div>
