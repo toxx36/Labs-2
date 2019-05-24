@@ -68,3 +68,4 @@ void led_set_max(uint8_t channel)
 		led_set(0, MAX_INTENSITY);
 	}
 }
+

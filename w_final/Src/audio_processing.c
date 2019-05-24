@@ -4,19 +4,26 @@
 
 static void gain_calc_freqs(void);
 /*static void filter_gain(float32_t *data, size_t data_size);*/
-static void filter_simple(float32_t *data_out, float32_t data_in, float32_t coef);//size_t count, float32_t coef)
+static void filter_simple(float32_t *data_out, float32_t data_in, float32_t coef);
 static void filter_get_max(float32_t *data, size_t data_size);
 static void filter_calc(size_t data_size);
 static void count_MA(float32_t *data, size_t data_size, size_t window_size);
 static float32_t* audio_fft(void);
 static float32_t* audio_input_conversion(uint16_t *audio);
 static void visual_get_peaks(void);
+static void visual_show_level(void);
 
 static float32_t avg_coef = FILTER_AVG_FREQ_SPEED;
 static float32_t avg_mult = FILTER_AVG_MULT;
 static float32_t max_coef = FILTER_MAX_FREQ_SPEED;
 static float32_t max_min_dif = FILTER_MAX_FREQ_MIN_DIF;
+static float32_t max_level_up_coef = FILTER_MAX_LEVEL_UP_SPEED;
+static float32_t max_level_down_coef = FILTER_MAX_LEVEL_DOWN_SPEED;
+static float32_t max_coef_add = FILTER_MAX_LEVEL_ADDITION;
 static float32_t gain_coef = GAIN_COEF;
+static float32_t gain_max_coef = GAIN_MAX_COEF;
+static float32_t gain_min_coef = GAIN_MIN_COEF;
+static float32_t gain_cur_coef = 1;
 static float32_t left_ch_buf[FFT_COMPLEX_SIZE];
 static float32_t magn[MAG_SIZE] = {0};
 static float32_t filter_data[MAG_SIZE] = {0};
@@ -24,6 +31,8 @@ static uint16_t bins_division[LED_COUNT + 1] = {LED1_RANGE, LED2_RANGE, LED3_RAN
 static float32_t max_freqs_power[LED_COUNT];
 static float32_t avg_freqs_power[LED_COUNT];
 static float32_t gain_freqs_power[LED_COUNT];
+static uint8_t button_switch(void);
+
 
 /*
 static void filter_gain(float32_t *data, size_t data_size)
@@ -70,6 +79,7 @@ static void gain_calc_freqs(void)
 	{	/* calc avg value of gain */
 		arm_mean_f32(filter_data + bins_division[i], bins_division[i + 1] - bins_division[i], gain_freqs_power + i);
 	}
+	//arm_mean_f32(filter_data, MAG_SIZE, &gain_avg);
 }
 
 static void count_MA(float32_t *data, size_t data_size, size_t window_size)
@@ -119,7 +129,7 @@ static void visual_get_peaks(void)
 {
 	size_t i;
 	float32_t mean;
-	float32_t freq_power;
+	float32_t max_freq_power;
 	float32_t avg_cur;
 	uint32_t max_index;
 	for(i = 0; i < LED_COUNT; i++)
@@ -127,18 +137,66 @@ static void visual_get_peaks(void)
 		arm_mean_f32(magn + bins_division[i], bins_division[i + 1] - bins_division[i], &mean);
 		filter_simple(avg_freqs_power + i, mean, avg_coef);
 		avg_cur = avg_freqs_power[i] * avg_mult; /* move up avg line */
-		arm_max_f32(magn + bins_division[i], bins_division[i + 1] - bins_division[i], &freq_power, &max_index);
-		if(freq_power > max_freqs_power[i] && freq_power > avg_cur
-				&& freq_power / avg_freqs_power[i] > max_min_dif
+		arm_max_f32(magn + bins_division[i], bins_division[i + 1] - bins_division[i], &max_freq_power, &max_index);
+		if(max_freq_power > max_freqs_power[i] && max_freq_power > avg_cur
+				&& max_freq_power / avg_freqs_power[i] > max_min_dif
 				&& avg_freqs_power[i] > gain_freqs_power[i] * gain_coef)
 		{
-			max_freqs_power[i] = freq_power;
+			max_freqs_power[i] = max_freq_power;
 			led_set_max(i + 1);
 		}
 		else
 		{
-			filter_simple(max_freqs_power + i, freq_power, max_coef);
+			filter_simple(max_freqs_power + i, max_freq_power, max_coef);
 			led_fade_out(i + 1, LED_FADE_SPEED);
+		}
+	}
+}
+
+static void visual_show_level(void)
+{
+	size_t i;
+	float32_t mean_dif_max = 0;
+	size_t mean_max_index = 0;
+	float32_t gain_freq_max_power;
+	float32_t gain_freq_min_power;
+	float32_t gain_calc_coef;
+
+	for(i = 0; i < LED_COUNT; i++)
+	{
+		gain_freq_max_power = gain_freqs_power[i] * gain_max_coef * gain_cur_coef;
+		arm_mean_f32(magn + bins_division[i], bins_division[i + 1] - bins_division[i], avg_freqs_power + i);
+		if(avg_freqs_power[i] > gain_freq_max_power && avg_freqs_power[i] - gain_freq_max_power > mean_dif_max)
+		{
+			mean_max_index = i;
+			mean_dif_max = avg_freqs_power[i];
+		}
+	}
+	gain_freq_max_power = gain_freqs_power[mean_max_index] * gain_max_coef * gain_cur_coef;
+	gain_calc_coef = (mean_dif_max / gain_freq_max_power) * max_coef_add;
+	if(mean_dif_max > 0 && gain_calc_coef > gain_cur_coef)
+	{
+		filter_simple(&gain_cur_coef, gain_calc_coef, max_level_up_coef);
+	}
+	else
+	{
+		filter_simple(&gain_cur_coef, 1, max_level_down_coef);
+	}
+	for(i = 0; i < LED_COUNT; i++)
+	{
+		gain_freq_max_power = gain_freqs_power[i] * gain_max_coef * gain_cur_coef;
+		gain_freq_min_power = gain_freqs_power[i] * gain_min_coef;
+		if(avg_freqs_power[i] > gain_freq_max_power)
+		{
+			led_set(i + 1, MAX_INTENSITY);
+		}
+		else if(avg_freqs_power[i] < gain_freq_min_power)
+		{
+			led_set(i + 1, 0);
+		}
+		else
+		{
+			led_set(i + 1, MAX_INTENSITY * avg_freqs_power[i] / gain_freq_max_power);
 		}
 	}
 }
@@ -151,7 +209,14 @@ void audio_I2S_handler(uint16_t *buffer16)
 	{
 		audio_input_conversion(buffer16);
 		audio_fft();
-		visual_get_peaks();
+		if(button_switch())
+		{
+			visual_show_level();
+		}
+		else
+		{
+			visual_get_peaks();
+		}
 	}
 	else if(state_counter < MIC_IDLE_TIME)
 	{
@@ -172,4 +237,27 @@ void audio_I2S_handler(uint16_t *buffer16)
 			state_counter++;
 		}
 	}
+}
+
+static uint8_t button_switch(void)
+{
+	static uint8_t state = 0;
+	static uint8_t counter = 0;
+	if(LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_0))
+	{
+		counter++;
+		if(counter > BUTTON_HOLD_TIME)
+		{
+			counter = 0;
+			state ^= 1;
+		}
+	}
+	else
+	{
+		if(counter)
+		{
+			counter = 0;
+		}
+	}
+	return state;
 }

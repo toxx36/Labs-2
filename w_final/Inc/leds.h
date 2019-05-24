@@ -2,7 +2,7 @@
 #define LEDS_H_
 
 #define LED_COUNT 4
-#define LED_FADE_SPEED 15
+#define LED_FADE_SPEED 20
 
 #include "main.h"
 #include "stm32f4xx.h"
