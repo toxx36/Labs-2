@@ -7,9 +7,9 @@ static void gain_calc_freqs(void);
 static void filter_simple(float32_t *data_out, float32_t data_in, float32_t coef);
 static void filter_get_max(float32_t *data, size_t data_size);
 static void filter_calc(size_t data_size);
-static void count_MA(float32_t *data, size_t data_size, size_t window_size);
+static void calc_MA(float32_t *data, size_t data_size, size_t window_size);
 static float32_t* audio_fft(void);
-static float32_t* audio_input_conversion(uint16_t *audio);
+static float32_t* audio_input_conversion(uint16_t *buffer16, uint8_t channel);
 static void visual_get_peaks(void);
 static void visual_show_level(void);
 
@@ -24,7 +24,7 @@ static float32_t gain_coef = GAIN_COEF;
 static float32_t gain_max_coef = GAIN_MAX_COEF;
 static float32_t gain_min_coef = GAIN_MIN_COEF;
 static float32_t gain_cur_coef = 1;
-static float32_t left_ch_buf[FFT_COMPLEX_SIZE];
+static float32_t audio_buf[FFT_COMPLEX_SIZE];
 static float32_t magn[MAG_SIZE] = {0};
 static float32_t filter_data[MAG_SIZE] = {0};
 static uint16_t bins_division[LED_COUNT + 1] = {LED1_RANGE, LED2_RANGE, LED3_RANGE, LED4_RANGE, MAG_SIZE};
@@ -69,7 +69,7 @@ static void filter_get_max(float32_t *data, size_t data_size)
 
 static void filter_calc(size_t data_size)
 {
-	count_MA(filter_data, data_size, 3);
+	calc_MA(filter_data, data_size, 3);
 }
 
 static void gain_calc_freqs(void)
@@ -82,7 +82,7 @@ static void gain_calc_freqs(void)
 	//arm_mean_f32(filter_data, MAG_SIZE, &gain_avg);
 }
 
-static void count_MA(float32_t *data, size_t data_size, size_t window_size)
+static void calc_MA(float32_t *data, size_t data_size, size_t window_size)
 {
 	size_t i; /* data counter */
 	size_t j = 0; /* window counter */
@@ -108,21 +108,21 @@ static float32_t* audio_fft(void)
 	arm_rfft_fast_instance_f32 fft_instance;
 	float32_t output[FFT_SIZE] = {0};
 	arm_rfft_fast_init_f32(&fft_instance, FFT_SIZE/*bin count*/);
-	arm_rfft_fast_f32(&fft_instance, left_ch_buf, output, 0);
+	arm_rfft_fast_f32(&fft_instance, audio_buf, output, 0);
 	/* ignore 2 first Re values in output - constant values*/
 	arm_cmplx_mag_f32(output + 2, magn, MAG_SIZE);
 	return magn;
 }
 
-static float32_t* audio_input_conversion(uint16_t *audio)
+static float32_t* audio_input_conversion(uint16_t *buffer16, uint8_t channel)
 {
 	size_t i;
 	for(i = 0; i < BUF_SIZE; i++)
 	{
-		left_ch_buf[i*2] = (int32_t)(audio[i*4] << 16 | audio[i*4+1]) >> 8;
-		left_ch_buf[i*2 + 1] = 0;
+		audio_buf[i*2] = (int32_t)(buffer16[i*4 + channel*2] << 16 | buffer16[i*4 + channel*2 + 1]) >> 8;
+		audio_buf[i*2 + 1] = 0;
 	}
-	return left_ch_buf;
+	return audio_buf;
 }
 
 static void visual_get_peaks(void)
@@ -207,7 +207,7 @@ void audio_I2S_handler(uint16_t *buffer16)
 	static uint16_t filter_counter = 0;
 	if(state_counter > MIC_IDLE_TIME)
 	{
-		audio_input_conversion(buffer16);
+		audio_input_conversion(buffer16, CHANNEL_SELECTED);
 		audio_fft();
 		if(button_switch())
 		{
@@ -226,7 +226,7 @@ void audio_I2S_handler(uint16_t *buffer16)
 	{
 		if(filter_counter < GAIN_SIZE)
 		{
-			audio_input_conversion(buffer16);
+			audio_input_conversion(buffer16, CHANNEL_SELECTED);
 			filter_get_max(audio_fft(), MAG_SIZE);
 			filter_counter++;
 		}

@@ -5,8 +5,9 @@
 #include "leds.h"
 
 /* Mic params */
-#define CHANNEL_COUNT 1
-#define FIRST_CHANNEL 0
+#define CHANNEL_LEFT 0
+#define CHANNEL_RIGHT 1
+#define CHANNEL_SELECTED CHANNEL_LEFT
 #define MIC_IDLE_TIME 20
 
 /* FFT params */
